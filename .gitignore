@@ -46,3 +46,6 @@ docker-compose.override.yml
 # Temporary files
 tmp/
 temp/
+
+# Local DB init 
+migration/init-db.sql
