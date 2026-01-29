@@ -1,0 +1,160 @@
+version: "3.8"
+
+services:
+  # PostgreSQL for Auth & Blog
+  postgres:
+    image: postgres:15-alpine
+    container_name: chatmenow-postgres
+    environment:
+      POSTGRES_USER: chatmenow
+      POSTGRES_PASSWORD: chatmenow123
+      POSTGRES_DB: chatmenow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - chatmenow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatmenow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB for Chat Messages
+  mongodb:
+    image: mongo:7
+    container_name: chatmenow-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: chatmenow
+      MONGO_INITDB_ROOT_PASSWORD: chatmenow123
+      MONGO_INITDB_DATABASE: chatmenow
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - chatmenow-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/chatmenow --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Presence & Caching
+  redis:
+    image: redis:7-alpine
+    container_name: chatmenow-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - chatmenow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Auth Service (NestJS)
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: chatmenow-auth
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://chatmenow:chatmenow123@postgres:5432/chatmenow
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 15m
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - chatmenow-network
+    restart: unless-stopped
+
+  # Blog Service (NestJS)
+  blog-service:
+    build:
+      context: ./blog-service
+      dockerfile: Dockerfile
+    container_name: chatmenow-blog
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_URL: postgresql://chatmenow:chatmenow123@postgres:5432/chatmenow
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - chatmenow-network
+    restart: unless-stopped
+
+  # Chat Service (Go)
+  chat-service:
+    build:
+      context: ./chat-service
+      dockerfile: Dockerfile
+    container_name: chatmenow-chat
+    environment:
+      PORT: 8080
+      MONGODB_URI: mongodb://chatmenow:chatmenow123@mongodb:27017/chatmenow?authSource=admin
+      REDIS_URL: redis:6379
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      POSTGRES_URL: postgresql://chatmenow:chatmenow123@postgres:5432/chatmenow
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - chatmenow-network
+    restart: unless-stopped
+
+  # Gateway (NestJS)
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: chatmenow-gateway
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      AUTH_SERVICE_URL: http://auth-service:3001
+      BLOG_SERVICE_URL: http://blog-service:3002
+      CHAT_SERVICE_URL: http://chat-service:8080
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      RATE_LIMIT_TTL: 60
+      RATE_LIMIT_MAX: 100
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - blog-service
+      - chat-service
+    networks:
+      - chatmenow-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+
+networks:
+  chatmenow-network:
+    driver: bridge
