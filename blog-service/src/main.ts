@@ -12,7 +12,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3002;
   await app.listen(port);
-  logger.log(`📝 Blog Service running on http://localhost:${port}`);
+  logger.log(`Blog Service running on http://localhost:${port}`);
 }
 
 bootstrap();

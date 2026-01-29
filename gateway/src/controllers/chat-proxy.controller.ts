@@ -13,8 +13,7 @@ import { JwtAuthGuard } from "../guards/jwt-auth.guard";
 @Controller("api/chat")
 @UseGuards(JwtAuthGuard)
 export class ChatProxyController {
-  private readonly chatServiceUrl =
-    process.env.CHAT_SERVICE_URL || "http://localhost:8080";
+  private readonly chatServiceUrl = process.env.CHAT_SERVICE_URL;
 
   constructor(private readonly proxyService: ProxyService) {}
 

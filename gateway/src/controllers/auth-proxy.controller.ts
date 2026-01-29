@@ -4,8 +4,7 @@ import { ProxyService } from "../services/proxy.service";
 
 @Controller("api/auth")
 export class AuthProxyController {
-  private readonly authServiceUrl =
-    process.env.AUTH_SERVICE_URL || "http://localhost:3001";
+  private readonly authServiceUrl = process.env.AUTH_SERVICE_URL;
 
   constructor(private readonly proxyService: ProxyService) {}
 

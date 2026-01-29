@@ -12,7 +12,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
-  logger.log(`🔐 Auth Service running on http://localhost:${port}`);
+  logger.log(`Auth Service running on http://localhost:${port}`);
 }
 
 bootstrap();

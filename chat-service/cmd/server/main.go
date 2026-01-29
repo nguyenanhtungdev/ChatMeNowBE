@@ -38,7 +38,7 @@ func autoMigrate(db *gorm.DB) error {
 }
 
 func main() {
-	// Load config
+
 	cfg := config.Load()
 
 	// Auto-migrate database schema
@@ -57,14 +57,11 @@ func main() {
 	conversationService := service.NewConversationService(conversationRepo)
 	presenceService := service.NewPresenceService(redisClient)
 
-	// Initialize WebSocket hub
 	hub := websocket.NewHub(messageService, presenceService)
 	go hub.Run()
 
-	// Initialize handlers
 	h := handler.New(cfg, messageService, conversationService, hub)
 
-	// Setup routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.HealthCheck)
 	mux.HandleFunc("/ws", h.WebSocketHandler)
@@ -84,9 +81,7 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Graceful shutdown
 	go func() {
-		log.Printf("Chat Service running on http://localhost:%s", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
 		}

@@ -1,14 +1,13 @@
 version: "3.8"
 
 services:
-  # PostgreSQL for Auth & Blog
   postgres:
     image: postgres:15-alpine
     container_name: chatmenow-postgres
     environment:
-      POSTGRES_USER: chatmenow
-      POSTGRES_PASSWORD: chatmenow123
-      POSTGRES_DB: chatmenow
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -17,19 +16,18 @@ services:
     networks:
       - chatmenow-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chatmenow"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # MongoDB for Chat Messages
   mongodb:
     image: mongo:7
     container_name: chatmenow-mongodb
     environment:
-      MONGO_INITDB_ROOT_USERNAME: chatmenow
-      MONGO_INITDB_ROOT_PASSWORD: chatmenow123
-      MONGO_INITDB_DATABASE: chatmenow
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
     ports:
       - "27017:27017"
     volumes:
@@ -37,12 +35,16 @@ services:
     networks:
       - chatmenow-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/chatmenow --quiet
+      # ping via mongosh with auth (correct for your auth-enabled mongo)
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --username ${MONGO_INITDB_ROOT_USERNAME} --password ${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --eval 'db.runCommand({ping:1}).ok' localhost:27017/${MONGO_INITDB_DATABASE} --quiet | grep 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis for Presence & Caching
   redis:
     image: redis:7-alpine
     container_name: chatmenow-redis
@@ -58,7 +60,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Auth Service (NestJS)
   auth-service:
     build:
       context: ./auth-service
@@ -66,13 +67,13 @@ services:
     container_name: chatmenow-auth
     environment:
       NODE_ENV: production
-      PORT: 3001
-      DATABASE_URL: postgresql://chatmenow:chatmenow123@postgres:5432/chatmenow
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      JWT_EXPIRES_IN: 15m
-      REFRESH_TOKEN_EXPIRES_IN: 7d
+      PORT: ${AUTH_SERVICE_PORT}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN}
     ports:
-      - "3001:3001"
+      - "${AUTH_SERVICE_PORT}:${AUTH_SERVICE_PORT}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,7 +81,6 @@ services:
       - chatmenow-network
     restart: unless-stopped
 
-  # Blog Service (NestJS)
   blog-service:
     build:
       context: ./blog-service
@@ -88,11 +88,11 @@ services:
     container_name: chatmenow-blog
     environment:
       NODE_ENV: production
-      PORT: 3002
-      DATABASE_URL: postgresql://chatmenow:chatmenow123@postgres:5432/chatmenow
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      PORT: ${BLOG_SERVICE_PORT}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
     ports:
-      - "3002:3002"
+      - "${BLOG_SERVICE_PORT}:${BLOG_SERVICE_PORT}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,20 +100,19 @@ services:
       - chatmenow-network
     restart: unless-stopped
 
-  # Chat Service (Go)
   chat-service:
     build:
       context: ./chat-service
       dockerfile: Dockerfile
     container_name: chatmenow-chat
     environment:
-      PORT: 8080
-      MONGODB_URI: mongodb://chatmenow:chatmenow123@mongodb:27017/chatmenow?authSource=admin
-      REDIS_URL: redis:6379
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      POSTGRES_URL: postgresql://chatmenow:chatmenow123@postgres:5432/chatmenow
+      PORT: ${CHAT_SERVICE_PORT}
+      MONGODB_URI: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/${MONGO_INITDB_DATABASE}?authSource=admin
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     ports:
-      - "8080:8080"
+      - "${CHAT_SERVICE_PORT}:${CHAT_SERVICE_PORT}"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -125,7 +124,6 @@ services:
       - chatmenow-network
     restart: unless-stopped
 
-  # Gateway (NestJS)
   gateway:
     build:
       context: ./gateway
@@ -133,15 +131,15 @@ services:
     container_name: chatmenow-gateway
     environment:
       NODE_ENV: production
-      PORT: 3000
-      AUTH_SERVICE_URL: http://auth-service:3001
-      BLOG_SERVICE_URL: http://blog-service:3002
-      CHAT_SERVICE_URL: http://chat-service:8080
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      RATE_LIMIT_TTL: 60
-      RATE_LIMIT_MAX: 100
+      PORT: ${GATEWAY_PORT}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      BLOG_SERVICE_URL: ${BLOG_SERVICE_URL}
+      CHAT_SERVICE_URL: ${CHAT_SERVICE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      RATE_LIMIT_TTL: ${RATE_LIMIT_TTL}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX}
     ports:
-      - "3000:3000"
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
     depends_on:
       - auth-service
       - blog-service

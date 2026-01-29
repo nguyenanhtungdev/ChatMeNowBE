@@ -32,7 +32,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  logger.log(`🚀 Gateway running on http://localhost:${port}`);
+  logger.log(`Gateway running on http://localhost:${port}`);
 }
 
 bootstrap();

@@ -22,14 +22,13 @@ type Config struct {
 
 func Load() *Config {
 	cfg := &Config{
-		Port:        getEnv("PORT", "8080"),
-		MongoURI:    getEnv("MONGODB_URI", "mongodb://localhost:27017/chatmenow"),
-		RedisURL:    getEnv("REDIS_URL", "localhost:6379"),
-		PostgresURL: getEnv("POSTGRES_URL", "postgresql://chatmenow:chatmenow123@localhost:5432/chatmenow"),
-		JWTSecret:   getEnv("JWT_SECRET", "your-secret-key"),
+		Port:        getEnv("PORT"),
+		MongoURI:    getEnv("MONGODB_URI"),
+		RedisURL:    getEnv("REDIS_URL"),
+		PostgresURL: getEnv("POSTGRES_URL"),
+		JWTSecret:   getEnv("JWT_SECRET"),
 	}
 
-	// Initialize GORM
 	var err error
 	cfg.DB, err = initGORM(cfg.PostgresURL)
 	if err != nil {
@@ -40,7 +39,6 @@ func Load() *Config {
 }
 
 func initGORM(postgresURL string) (*gorm.DB, error) {
-	// Configure GORM logger
 	gormLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
@@ -61,18 +59,15 @@ func initGORM(postgresURL string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Get underlying SQL DB for connection pool settings
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database instance: %w", err)
 	}
 
-	// Connection pool settings
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	// Enable UUID extension
 	if err := db.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"").Error; err != nil {
 		log.Printf("Warning: Could not create uuid-ossp extension: %v", err)
 	}
@@ -81,9 +76,9 @@ func initGORM(postgresURL string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func getEnv(key, defaultValue string) string {
+func getEnv(key string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
-	return defaultValue
+	return ""
 }

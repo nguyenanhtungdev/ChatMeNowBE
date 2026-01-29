@@ -13,8 +13,7 @@ import { JwtAuthGuard } from "../guards/jwt-auth.guard";
 @Controller("api/blog")
 @UseGuards(JwtAuthGuard)
 export class BlogProxyController {
-  private readonly blogServiceUrl =
-    process.env.BLOG_SERVICE_URL || "http://localhost:3002";
+  private readonly blogServiceUrl = process.env.BLOG_SERVICE_URL;
 
   constructor(private readonly proxyService: ProxyService) {}
 
